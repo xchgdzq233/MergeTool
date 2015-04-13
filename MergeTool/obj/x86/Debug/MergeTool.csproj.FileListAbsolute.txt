@@ -1,4 +1,3 @@
-C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\obj\x86\Debug\MergeTool.csprojResolveAssemblyReference.cache
 C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\bin\Debug\MergeTool.exe
 C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\bin\Debug\MergeTool.pdb
 C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\bin\Debug\PdfSharp.dll

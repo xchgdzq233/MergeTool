@@ -60,11 +60,11 @@ namespace MergeTool
                 }
 
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                Console.WriteLine(ex.Message);
+                Console.WriteLine(e.Message);
                 Console.WriteLine("tiff error occured in folder " + str_DestinationPath);
-                logging(str_DestinationPath, "tiff");
+                logging(str_DestinationPath, "tiff", e.ToString());
             }
         }
 
@@ -89,11 +89,11 @@ namespace MergeTool
             catch (Exception e)
             {
                 Console.WriteLine("pdf error occured in folder " + destination);
-                logging(destination, "pdf");
+                logging(destination, "pdf", e.ToString());
             }
         }
 
-        static void logging(string destination, string tiffOrPdf)
+        static void logging(string destination, string tiffOrPdf, string errorMesg)
         {
             string logName = startTime.ToString().Replace(" ", string.Empty).Replace("/", string.Empty).Replace(":", string.Empty);
             string logPath = @"C:\log\" + logName + ".txt";
@@ -107,6 +107,8 @@ namespace MergeTool
             using (StreamWriter file = File.AppendText(logPath))
             {
                 file.WriteLine(tiffOrPdf + " error occured in folder " + destination);
+                file.WriteLine(errorMesg);
+                file.WriteLine();
             }
         }
 
@@ -144,22 +146,22 @@ namespace MergeTool
             DirectoryInfo root = new DirectoryInfo(rootFolder);
             DirectoryInfo[] subdirs = root.GetDirectories();
             string[] images;
-            List<string> docFolders = new List<string>();
+            List<string> docNames = new List<string>();
             foreach (DirectoryInfo subdir in subdirs)
             {
-                docFolders.Add(subdir.ToString());
+                docNames.Add(subdir.ToString());
             }
-            docFolders.Sort();
-            foreach (string docFolder in docFolders)
+            docNames.Sort();
+            foreach (string docName in docNames)
             {
-                string destinationFolder = destinationRoot + @"\" + docFolder;
+                string destinationFolder = destinationRoot + @"\" + docName;
                 if (!Directory.Exists(destinationFolder))
                 {
                     Directory.CreateDirectory(destinationFolder);
-                    images = Directory.GetFiles(rootFolder + @"\" + docFolder);
+                    images = Directory.GetFiles(rootFolder + @"\" + docName);
                     List<string> imagesList = images.ToList();
                     imagesList.Sort();
-                    string destination = destinationFolder + @"\" + docFolder;
+                    string destination = destinationFolder + @"\" + docName;
 
                     Thread tiff = new Thread(new ThreadStart(() => mergeTiffPages(destination, imagesList)));
                     tiff.Start();
@@ -168,7 +170,7 @@ namespace MergeTool
                 }
                 else
                 {
-                    logging(destinationFolder, "duplicate destination");
+                    logging(destinationFolder, "duplicate destination", "just delete the folder(s) in the destination folder");
                 }
             }
         }
