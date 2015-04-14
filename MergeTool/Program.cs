@@ -8,6 +8,8 @@ using System.IO;
 using System.Windows.Forms;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Data;
+using System.Data.SqlClient;
 
 namespace MergeTool
 {
@@ -58,7 +60,6 @@ namespace MergeTool
                     imagePararms.Dispose();
                     DestinationImage.Dispose();
                 }
-
             }
             catch (Exception e)
             {
@@ -110,6 +111,7 @@ namespace MergeTool
                 file.WriteLine(errorMesg);
                 file.WriteLine();
             }
+            throw new Exception();
         }
 
         [STAThread]
@@ -154,23 +156,82 @@ namespace MergeTool
             docNames.Sort();
             foreach (string docName in docNames)
             {
-                string destinationFolder = destinationRoot + @"\" + docName;
-                if (!Directory.Exists(destinationFolder))
+                try
                 {
-                    Directory.CreateDirectory(destinationFolder);
-                    images = Directory.GetFiles(rootFolder + @"\" + docName);
-                    List<string> imagesList = images.ToList();
-                    imagesList.Sort();
-                    string destination = destinationFolder + @"\" + docName;
+                    //check if this doc is already merged
+                    SqlConnection cnn = new SqlConnection();
+                    cnn.ConnectionString = "Data Source=;Initial Catalog=;Integrated Security=True";
+                    DataSet ds = new DataSet();
+                    cnn.Open();
+                    SqlDataAdapter da = new SqlDataAdapter();
 
-                    Thread tiff = new Thread(new ThreadStart(() => mergeTiffPages(destination, imagesList)));
-                    tiff.Start();
-                    Thread pdf = new Thread(new ThreadStart(() => mergePdf(destination, imagesList)));
-                    pdf.Start();
+                    String sql = String.Format("select FetchStatus from MigrationDB.dbo.is_docmap where DocId = {0}", docName);
+                    SqlCommand cmd = new SqlCommand(sql, cnn);
+
+                    da.SelectCommand = cmd;
+                    da.Fill(ds);
+                    cnn.Close();
+
+                    DataTable dt = ds.Tables[0];
+                    if (dt.Rows[0][0].ToString() != "done")
+                    {
+                        string destinationFolder = destinationRoot + @"\" + docName;
+                        if (!Directory.Exists(destinationFolder))
+                        {
+                            Directory.CreateDirectory(destinationFolder);
+                            images = Directory.GetFiles(rootFolder + @"\" + docName);
+                            List<string> imagesList = images.ToList();
+                            imagesList.Sort();
+                            string destination = destinationFolder + @"\" + docName;
+
+                            try
+                            {
+                                Thread tiff = new Thread(new ThreadStart(() => mergeTiffPages(destination, imagesList)));
+                                tiff.Start();
+                                Thread pdf = new Thread(new ThreadStart(() => mergePdf(destination, imagesList)));
+                                pdf.Start();
+                                tiff.Join();
+                                pdf.Join();
+
+                                //update the merged and converted information
+                                sql = String.Format("update MigrationDB.dbo.is_docmap set MergeStatus = 'done', MergeExportDirectory = '{0}' where DocId = {1}", destinationFolder, docName);
+                                SqlTransaction trans = cnn.BeginTransaction();
+
+                                try
+                                {
+                                    cnn.Open();
+                                    cmd = new SqlCommand();
+
+                                    cmd.Connection = cnn;
+                                    cmd.Transaction = trans;
+
+                                    cmd.CommandText = sql;
+                                    cmd.ExecuteNonQuery();
+
+                                    trans.Commit();
+                                    cnn.Close();
+                                }
+                                catch (SqlException e)
+                                {
+                                    logging(destinationFolder, "sql transaction error", "happened at docClass = " + docName);
+                                    trans.Rollback();
+                                    cnn.Close();
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                            }
+                        }
+                        else
+                        {
+                            logging(destinationFolder, "duplicate destination", "just delete the folder(s) in the destination folder");
+                        }
+                    }
+                    cnn.Dispose();
                 }
-                else
+                catch (SqlException e)
                 {
-                    logging(destinationFolder, "duplicate destination", "just delete the folder(s) in the destination folder");
+                    logging("no destination", "sql query/connection error", "happened at docClass = " + docName);
                 }
             }
         }
