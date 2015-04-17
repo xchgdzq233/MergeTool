@@ -165,7 +165,7 @@ namespace MergeTool
                     cnn.Open();
                     SqlDataAdapter da = new SqlDataAdapter();
 
-                    String sql = String.Format("select FetchStatus from MigrationDB.dbo.is_docmap where DocId = {0}", docName);
+                    String sql = String.Format("select MergeStatus, MimeType from MigrationDB.dbo.is_docmap where DocId = {0}", docName);
                     SqlCommand cmd = new SqlCommand(sql, cnn);
 
                     da.SelectCommand = cmd;
@@ -173,7 +173,7 @@ namespace MergeTool
                     cnn.Close();
 
                     DataTable dt = ds.Tables[0];
-                    if (dt.Rows[0][0].ToString() != "done")
+                    if (dt.Rows[0][0].ToString() != "Success" && dt.Rows[0][1].ToString() == "image/tiff")
                     {
                         string destinationFolder = destinationRoot + @"\" + docName;
                         if (!Directory.Exists(destinationFolder))
@@ -194,7 +194,7 @@ namespace MergeTool
                                 pdf.Join();
 
                                 //update the merged and converted information
-                                sql = String.Format("update MigrationDB.dbo.is_docmap set MergeStatus = 'done', MergeExportDirectory = '{0}' where DocId = {1}", destinationFolder, docName);
+                                sql = String.Format("update MigrationDB.dbo.is_docmap set MergeStatus = 'Success', MergeExportDirectory = '{0}' where DocId = {1}", destinationFolder, docName);
                                 SqlTransaction trans = cnn.BeginTransaction();
 
                                 try
