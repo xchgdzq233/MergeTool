@@ -1,6 +1,0 @@
-C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\bin\Debug\MergeTool.exe
-C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\bin\Debug\MergeTool.pdb
-C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\bin\Debug\PdfSharp.dll
-C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\bin\Debug\de\PdfSharp.resources.dll
-C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\obj\x86\Debug\MergeTool.exe
-C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\obj\x86\Debug\MergeTool.pdb

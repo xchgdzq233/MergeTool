@@ -1,0 +1,10 @@
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\bin\Debug\MergeTool.exe
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\bin\Debug\MergeTool.pdb
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\obj\x86\Debug\MergeTool.Form1.resources
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\obj\x86\Debug\MergeTool.Properties.Resources.resources
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\obj\x86\Debug\MergeTool.csproj.GenerateResource.Cache
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\obj\x86\Debug\MergeTool.exe
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\obj\x86\Debug\MergeTool.pdb
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\bin\Debug\itextsharp.dll
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\bin\Debug\itextsharp.xml
+C:\Users\janetxue\Documents\GitHub\MergeTool\MergeTool\MergeTool\obj\x86\Debug\MergeTool.csprojResolveAssemblyReference.cache
