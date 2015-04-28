@@ -24,6 +24,7 @@ namespace MergeTool
         private static SqlConnection migrationDBCnn;
         private static SqlConnection destinationDBCnn;
         private static String customErrMesg;
+        private static Boolean threadResult;
 
         [STAThread]
         static void Main(string[] args)
@@ -47,10 +48,23 @@ namespace MergeTool
                 destinationDBCnn = new SqlConnection();
                 Thread migrationDBThread = new Thread(new ThreadStart(() => initDBConnection("MigrationDB", "", "")));
                 Thread destinationDBThread = new Thread(new ThreadStart(() => initDBConnection("DestinationDB", "", "")));
+
+                //reset thread flag
+                threadResult = true;
+
+                //start threads
                 migrationDBThread.Start();
                 destinationDBThread.Start();
                 migrationDBThread.Join();
                 destinationDBThread.Join();
+                //initDBConnection("MigrationDB", "", "");
+                //initDBConnection("DestinationDB", "", "");
+
+                //check thread flag
+                if (!threadResult)
+                {
+                    throw new Exception();
+                }
 
                 //get un-merged records from MigrationDB
                 String sql = String.Format("select DocId, DOCS_Pages, FetchExportDirectory from is_docmap where MimeType = 'image/tiff' and FetchStatus = 'Success' and  MergeStatus is null and FetchExportDirectory is not null");
@@ -104,21 +118,33 @@ namespace MergeTool
                         //start merging tiff and pdf
                         Thread tiff = new Thread(new ThreadStart(() => mergeTiff(lstImages, strDestinationFileNamePre)));
                         Thread pdf = new Thread(new ThreadStart(() => mergePdf(lstImages, strDestinationFileNamePre)));
+
+                        //reset thread flag
+                        threadResult = true;
+
+                        //start threads
                         tiff.Start();
                         pdf.Start();
                         tiff.Join();
                         pdf.Join();
 
+                        //check thread flag
+                        if (!threadResult)
+                        {
+                            throw new Exception();
+                        }
+
                         //update database records
                         sql = String.Format("update MigrationDB.dbo.is_docmap set MergeStatus = 'Success', MergeExportDirectory = '{0}' where DocId = {1}", strDestinationFolder, strDocID);
                         dbTransaction(sql, migrationDBCnn);
                     }
-                    catch (Exception e)
+                    catch (Exception)
                     {
+                        continue;
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
             }
             finally
@@ -133,6 +159,13 @@ namespace MergeTool
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
+        private static void MyThreadExcpetionHandler(String errMesg, Exception e)
+        {
+            logging(errMesg, e.Message);
+            //update thread flag
+            threadResult = false;
+        }
+
         private static void logging(String customErrorMesg, string errorMesg)
         {
             string logName = startTime.ToString().Replace(" ", string.Empty).Replace("/", string.Empty).Replace(":", string.Empty);
@@ -175,8 +208,7 @@ namespace MergeTool
             catch (Exception e)
             {
                 customErrMesg = String.Format("Cannot establish database connection for {0}", dbName);
-                logging(customErrMesg, e.Message);
-                throw;
+                MyThreadExcpetionHandler(customErrMesg, e);
             }
         }
 
@@ -267,19 +299,17 @@ namespace MergeTool
                 if (pdfReader.NumberOfPages != lstImages.Count)
                 {
                     customErrMesg = String.Format("The page number of the merged pdf file {0} doesn't match database record", strDestinationFileName);
-                    logging(customErrMesg, "");
-                    throw new CustomException();
+                    throw new PageNumMismatchException(customErrMesg);
                 }
             }
-            catch (CustomException e)
+            catch (PageNumMismatchException e)
             {
-                throw;
+                MyThreadExcpetionHandler(e.Message, e);
             }
             catch (Exception e)
             {
                 customErrMesg = String.Format("Pdf merging error occured at {0}", strDestinationFileName);
-                logging(customErrMesg, e.Message);
-                throw;
+                MyThreadExcpetionHandler(customErrMesg, e);
             }
         }
 
@@ -341,7 +371,7 @@ namespace MergeTool
                         {
                             customErrMesg = String.Format("Corrupted tiff page found in merged tiff file at {0}", strDestinationFileName);
                             logging(customErrMesg, "");
-                            throw new CustomException();
+                            throw new PageNumMismatchException();
                         }
                     }
 
@@ -349,20 +379,18 @@ namespace MergeTool
                     if (lstImages.Count != numberOfDirectories)
                     {
                         customErrMesg = String.Format("The page number of the merged tiff file {0} doesn't match database record", strDestinationFileName);
-                        logging(customErrMesg, "");
-                        throw new CustomException();
+                        throw new PageNumMismatchException(customErrMesg);
                     }
                 }
             }
-            catch (CustomException e)
+            catch (PageNumMismatchException e)
             {
-                throw;
+                MyThreadExcpetionHandler(e.Message, e);
             }
             catch (Exception e)
             {
                 customErrMesg = String.Format("Tif merging error occured at {0}", strDestinationFileName);
-                logging(customErrMesg, e.Message);
-                throw;
+                MyThreadExcpetionHandler(customErrMesg, e);
             }
         }
     }
