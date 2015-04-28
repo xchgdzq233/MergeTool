@@ -1,17 +1,17 @@
 ﻿using System;
 
-public class CustomException : Exception
+public class PageNumMismatchException : Exception
 {
-    public CustomException()
+    public PageNumMismatchException()
     {
     }
 
-    public CustomException(string message)
+    public PageNumMismatchException(string message)
         : base(message)
     {
     }
 
-    public CustomException(string message, Exception inner)
+    public PageNumMismatchException(string message, Exception inner)
         : base(message, inner)
     {
     }
