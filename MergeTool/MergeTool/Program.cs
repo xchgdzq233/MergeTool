@@ -20,21 +20,23 @@ namespace MergeTool
 {
     class Program
     {
-        private static DateTime startTime;
+        public const String DocClass = "Late_3";
+        private static String startTime;
         private static SqlConnection migrationDBCnn;
-        private static SqlConnection destinationDBCnn;
         private static String customErrMesg;
         private static Boolean threadResult;
 
         [STAThread]
         static void Main(string[] args)
         {
-            startTime = DateTime.Now;
+            startTime = DateTime.Now.ToString("yyyyMMddHHmmss");
+            int totalDoc = 0;
+            int successDoc = 0;
 
             //open a folder browser to select the destination root folder for all the merged tiff and pdf files
             FolderBrowserDialog fdb = new FolderBrowserDialog();
             fdb.Description = "Select the destination folder for exporting the merged files";
-            fdb.SelectedPath = @"C:\Users\janetxue\Downloads\Migration\testing\DestinationTiff";
+            fdb.SelectedPath = @"Y:\FairfaxStorage\Images\Exported Images";
             if (fdb.ShowDialog() != DialogResult.OK)
             {
                 Environment.Exit(0);
@@ -45,32 +47,32 @@ namespace MergeTool
             {
                 //connect to the MigrationDB and DestinationDB
                 migrationDBCnn = new SqlConnection();
-                destinationDBCnn = new SqlConnection();
                 Thread migrationDBThread = new Thread(new ThreadStart(() => initDBConnection("MigrationDB", "", "")));
-                Thread destinationDBThread = new Thread(new ThreadStart(() => initDBConnection("DestinationDB", "", "")));
 
                 //reset thread flag
                 threadResult = true;
 
                 //start threads
                 migrationDBThread.Start();
-                destinationDBThread.Start();
                 migrationDBThread.Join();
-                destinationDBThread.Join();
-                //initDBConnection("MigrationDB", "", "");
-                //initDBConnection("DestinationDB", "", "");
 
                 //check thread flag
                 if (!threadResult)
                 {
                     throw new Exception();
                 }
+                Console.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + " => Database connected.");
 
                 //get un-merged records from MigrationDB
-                String sql = String.Format("select DocId, DOCS_Pages, FetchExportDirectory from is_docmap where MimeType = 'image/tiff' and FetchStatus = 'Success' and  MergeStatus is null and FetchExportDirectory is not null");
+                String sql = String.Format("select DocId, DOCS_Pages, FetchExportDirectory from is_docmap where MimeType = 'image/tiff' and FetchStatus = 'Success' and MergeStatus is null FetchExportDirectory is not null and DocClass = '{0}'", DocClass);
                 DataRowCollection drSourceDocs = dbSelect(sql, migrationDBCnn).Tables[0].Rows;
 
-                //for merge tiff error
+                //prepare statistic variables
+                totalDoc = drSourceDocs.Count;
+                successDoc = 0;
+                Console.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + " => Found " + totalDoc + " docs ready to merge");
+
+                //for merge tiff error handle
                 Tiff.SetErrorHandler(new MyTiffErrorHandler());
 
                 foreach (DataRow drSourceDoc in drSourceDocs)
@@ -80,6 +82,8 @@ namespace MergeTool
                         string strDocID = drSourceDoc[0].ToString();
                         string strPageNum = drSourceDoc[1].ToString();
                         string strSourceFolder = drSourceDoc[2].ToString();
+
+                        Console.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + " => Start merging doc " + strDocID + ".");
 
                         //check if the doc path exits
                         if (!Directory.Exists(strSourceFolder))
@@ -92,9 +96,10 @@ namespace MergeTool
                         //get all the files under the path
                         List<string> lstImages = Directory.GetFiles(strSourceFolder).ToList();
                         lstImages.Sort();
+                        Console.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + " => Get all files for doc " + strDocID + ".");
 
                         //check if the page number match
-                        if (!strPageNum.Equals(lstImages.Count))
+                        if (!strPageNum.Equals(lstImages.Count.ToString()))
                         {
                             customErrMesg = String.Format("Doc {0} actual page number({1}) mismatch database record({2})", strDocID, lstImages.Count, strPageNum);
                             logging(customErrMesg, "");
@@ -108,11 +113,23 @@ namespace MergeTool
                         {
                             customErrMesg = String.Format("Doc {0} already exits in destination root folder {1}, deleting it...", strDocID, strDestinationFolder);
                             logging(customErrMesg, "");
-                            Directory.Delete(strDestinationFolder, true);
+
+                            //delete all files under the directory
+                            DirectoryInfo dirDestinationFolder = new DirectoryInfo(strDestinationFolder);
+                            foreach (FileInfo file in dirDestinationFolder.GetFiles())
+                            {
+                                if (!file.Name.Equals("Thumbs.db"))
+                                {
+                                    file.Delete();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            //create the destination folder and file name for the docs
+                            Directory.CreateDirectory(strDestinationFolder);
                         }
 
-                        //create the destination folder and file name for the docs
-                        Directory.CreateDirectory(strDestinationFolder);
                         string strDestinationFileNamePre = strDestinationFolder + @"\" + strDocID;
 
                         //start merging tiff and pdf
@@ -124,7 +141,9 @@ namespace MergeTool
 
                         //start threads
                         tiff.Start();
+                        Console.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + " => Start creating tiff file for doc " + ".");
                         pdf.Start();
+                        Console.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + " => Start creating pdf file for doc " + ".");
                         tiff.Join();
                         pdf.Join();
 
@@ -137,24 +156,27 @@ namespace MergeTool
                         //update database records
                         sql = String.Format("update MigrationDB.dbo.is_docmap set MergeStatus = 'Success', MergeExportDirectory = '{0}' where DocId = {1}", strDestinationFolder, strDocID);
                         dbTransaction(sql, migrationDBCnn);
+                        successDoc++;
                     }
-                    catch (Exception)
+                    catch (Exception e)
                     {
+                        logging("Error occurred inside the loop", e.Message);
                         continue;
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                logging("Error occurred at main thread", e.Message);
             }
             finally
             {
                 //close database connections
                 migrationDBCnn.Close();
                 migrationDBCnn.Dispose();
-                destinationDBCnn.Close();
-                destinationDBCnn.Dispose();
             }
+            Console.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + " => Merge process finished. Merged " + successDoc + " docs. Failed " + (totalDoc - successDoc) + " docs.");
+            Console.ReadKey();
             Environment.Exit(0);
         }
 
@@ -168,8 +190,7 @@ namespace MergeTool
 
         private static void logging(String customErrorMesg, string errorMesg)
         {
-            string logName = startTime.ToString().Replace(" ", string.Empty).Replace("/", string.Empty).Replace(":", string.Empty);
-            string logPath = @"C:\log\" + logName + ".txt";
+            string logPath = @"C:\log\" + startTime + ".txt";
             if (!File.Exists(logPath))
             {
                 using (StreamWriter file = File.CreateText(logPath))
@@ -187,23 +208,14 @@ namespace MergeTool
 
         private static void initDBConnection(string dbName, string dbUID, string dbPassword)
         {
-            Console.WriteLine("Connecting to database {0}", dbName);
-            string strCnnString = String.Format("Data Source=(local);Initial Catalog={0};Persist Security Info=True;User ID={1};Password={2};", dbName, dbUID, dbPassword);
+            Console.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + " => Connecting to database {0}", dbName);
+            string strCnnString = String.Format("Data Source=USDXYSMRL1VW024;Initial Catalog={0};Integrated Security=True;", dbName, dbUID, dbPassword);
 
             try
             {
-                if (dbName.Equals("MigrationDB"))
-                {
-                    migrationDBCnn.ConnectionString = strCnnString;
-                    migrationDBCnn.Open();
-                    migrationDBCnn.Close();
-                }
-                else
-                {
-                    destinationDBCnn.ConnectionString = strCnnString;
-                    destinationDBCnn.Open();
-                    destinationDBCnn.Close();
-                }
+                migrationDBCnn.ConnectionString = strCnnString;
+                migrationDBCnn.Open();
+                migrationDBCnn.Close();
             }
             catch (Exception e)
             {
